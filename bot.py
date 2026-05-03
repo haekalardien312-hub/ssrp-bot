@@ -1,6 +1,7 @@
 import discord
 from discord.ext import commands, tasks
 import asyncio
+import os
 import csv
 import io
 from datetime import datetime, timedelta, timezone
