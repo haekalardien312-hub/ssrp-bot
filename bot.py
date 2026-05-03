@@ -14,7 +14,7 @@ from openpyxl.utils import get_column_letter
 
 # ==================== CONFIG ====================
 DISCORD_TOKEN = os.environ.get("DISCORD_TOKEN")
-APPROVAL_CHANNEL_NAME = "ssrp-aproval"    # Channel submit SSRP
+APPROVAL_CHANNEL_NAME = "ssrp-approval"    # Channel submit SSRP
 REPORT_CHANNEL_NAME   = "ssrp-report"     # Channel laporan otomatis
 INACTIVE_CHANNEL_NAME = "ssrp-inactive"   # Channel notif tidak aktif
 SUBMIT_COOLDOWN       = 30                # Detik jeda antar submit (anti-spam)
