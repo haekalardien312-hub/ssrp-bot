@@ -444,6 +444,131 @@ async def reset_week(ctx):
     conn.commit(); conn.close()
     await ctx.reply("✅ **Poin mingguan semua member sudah di-reset!**")
 
+async def send_log(guild, action, admin, target, amount, before, after):
+    """Kirim log ke channel admin."""
+    log_channel = discord.utils.get(guild.text_channels, name=LOG_CHANNEL_NAME)
+    if not log_channel:
+        return
+    color = 0x2ECC71 if action == "ADD" else 0xE74C3C
+    icon  = "➕" if action == "ADD" else "➖"
+    embed = discord.Embed(
+        title=f"{icon} Poin {action} — Log Admin",
+        color=color,
+        timestamp=datetime.now(timezone.utc)
+    )
+    embed.add_field(name="👮 Admin",    value=admin.mention,         inline=True)
+    embed.add_field(name="👤 Target",   value=target.mention,        inline=True)
+    embed.add_field(name="🔢 Jumlah",   value=f"{amount} poin",      inline=True)
+    embed.add_field(name="📉 Sebelum",  value=f"{before} poin",      inline=True)
+    embed.add_field(name="📈 Sesudah",  value=f"{after} poin",       inline=True)
+    embed.set_footer(text="SSRP Admin Log")
+    await log_channel.send(embed=embed)
+
+@bot.command(name="addpoint")
+@commands.has_any_role(ADMIN_ROLE_ID)
+async def add_point_cmd(ctx, member: discord.Member = None, amount: int = 1):
+    """Tambah poin manual. !addpoint @user [jumlah]"""
+    if not member:
+        await ctx.reply("❌ Gunakan: `!addpoint @user [jumlah]`"); return
+    if amount < 1:
+        await ctx.reply("❌ Jumlah harus minimal 1."); return
+
+    # Ambil poin sebelum
+    before_row = get_user_point(str(member.id))
+    before = before_row[0] if before_row else 0
+
+    result = manual_add_point(str(member.id), member.display_name, amount)
+    after = result[0]
+
+    embed = discord.Embed(title="➕ Poin Ditambahkan!", color=0x2ECC71)
+    embed.set_author(name=member.display_name, icon_url=member.display_avatar.url)
+    embed.add_field(name="👤 Player",    value=member.mention, inline=True)
+    embed.add_field(name="➕ Ditambah",  value=f"{amount} poin", inline=True)
+    embed.add_field(name="🏆 Total Baru", value=f"{after} poin", inline=True)
+    await ctx.reply(embed=embed)
+
+    await send_log(ctx.guild, "ADD", ctx.author, member, amount, before, after)
+
+@bot.command(name="removepoint")
+@commands.has_any_role(ADMIN_ROLE_ID)
+async def remove_point_cmd(ctx, member: discord.Member = None, amount: int = 1):
+    """Hapus poin manual. !removepoint @user [jumlah]"""
+    if not member:
+        await ctx.reply("❌ Gunakan: `!removepoint @user [jumlah]`"); return
+    if amount < 1:
+        await ctx.reply("❌ Jumlah harus minimal 1."); return
+
+    row = get_user_point(str(member.id))
+    if not row:
+        await ctx.reply(f"❌ **{member.display_name}** belum punya data poin."); return
+
+    before = row[0]
+
+    # Simpan pending konfirmasi
+    pending_removals[str(ctx.author.id)] = {
+        "target_id":   str(member.id),
+        "target_name": member.display_name,
+        "target_obj":  member,
+        "amount":      amount,
+        "before":      before,
+        "expires":     datetime.now(timezone.utc).timestamp() + 30
+    }
+
+    embed = discord.Embed(
+        title="⚠️ Konfirmasi Hapus Poin",
+        description=(
+            f"Kamu akan menghapus **{amount} poin** dari {member.mention}\n"
+            f"Poin sekarang: **{before}** → setelah: **{max(0, before - amount)}**\n\n"
+            f"Ketik **`!confirm`** dalam **30 detik** untuk lanjutkan.\nKetik **`!cancel`** untuk batalkan."
+        ),
+        color=0xE67E22
+    )
+    await ctx.reply(embed=embed)
+
+@bot.command(name="confirm")
+@commands.has_any_role(ADMIN_ROLE_ID)
+async def confirm_remove(ctx):
+    """Konfirmasi removepoint."""
+    admin_id = str(ctx.author.id)
+    pending = pending_removals.get(admin_id)
+
+    if not pending:
+        await ctx.reply("❌ Tidak ada pending removepoint untuk kamu."); return
+
+    if datetime.now(timezone.utc).timestamp() > pending["expires"]:
+        del pending_removals[admin_id]
+        await ctx.reply("❌ Waktu konfirmasi habis (30 detik). Ulangi `!removepoint` lagi."); return
+
+    result = manual_remove_point(pending["target_id"], pending["amount"])
+    if not result:
+        await ctx.reply("❌ Gagal, member tidak ditemukan di database."); return
+
+    after = result[0]
+    member = pending["target_obj"]
+    before = pending["before"]
+    amount = pending["amount"]
+    del pending_removals[admin_id]
+
+    embed = discord.Embed(title="➖ Poin Dihapus!", color=0xE74C3C)
+    embed.set_author(name=member.display_name, icon_url=member.display_avatar.url)
+    embed.add_field(name="👤 Player",     value=member.mention,  inline=True)
+    embed.add_field(name="➖ Dihapus",    value=f"{amount} poin", inline=True)
+    embed.add_field(name="🏆 Total Baru", value=f"{after} poin",  inline=True)
+    await ctx.reply(embed=embed)
+
+    await send_log(ctx.guild, "REMOVE", ctx.author, member, amount, before, after)
+
+@bot.command(name="cancel")
+@commands.has_any_role(ADMIN_ROLE_ID)
+async def cancel_remove(ctx):
+    """Batalkan removepoint yang pending."""
+    admin_id = str(ctx.author.id)
+    if admin_id in pending_removals:
+        del pending_removals[admin_id]
+        await ctx.reply("✅ Removepoint dibatalkan.")
+    else:
+        await ctx.reply("❌ Tidak ada pending removepoint.")
+
 @bot.command(name="ssrphelp")
 async def ssrp_help(ctx):
     embed = discord.Embed(title="🤖 SSRP Checker Bot", color=0x5865F2)
@@ -455,6 +580,10 @@ async def ssrp_help(ctx):
         "`!ssrphelp` — Bantuan"
     ), inline=False)
     embed.add_field(name="🔧 Commands Admin", value=(
+        "`!addpoint @user [n]` — Tambah poin manual\n"
+        "`!removepoint @user [n]` — Hapus poin (butuh !confirm)\n"
+        "`!confirm` — Konfirmasi removepoint\n"
+        "`!cancel` — Batalkan removepoint\n"
         "`!export excel` — Export ke Excel\n"
         "`!export csv` — Export ke CSV\n"
         "`!export all` — Export keduanya\n"
