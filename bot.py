@@ -21,6 +21,7 @@ SUBMIT_COOLDOWN       = 30                # Detik jeda antar submit (anti-spam)
 INACTIVE_CHECK_HOUR   = 9                 # Jam berapa cek inaktif (UTC)
 INACTIVE_CHECK_WEEKDAY= 0                 # 0=Senin, 6=Minggu
 ADMIN_ROLE_ID         = 1358301859663839374  # Role ID yang bisa pakai command admin
+LOG_CHANNEL_NAME      = "ssrp-check"     # Channel log addpoint/removepoint
 # ================================================
 
 intents = discord.Intents.default()
@@ -29,6 +30,9 @@ intents.members = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 last_submit: dict[str, datetime] = defaultdict(lambda: datetime.min.replace(tzinfo=timezone.utc))
+
+# Pending removepoint confirmations: {admin_user_id: {target_id, target_name, amount, expires}}
+pending_removals: dict[str, dict] = {}
 
 # ─── Database ─────────────────────────────────────────────────────────────────
 DB = "ssrp_points.db"
@@ -116,6 +120,37 @@ def get_inactive_users(days=7):
     rows = c.fetchall()
     conn.close()
     return rows
+
+def manual_add_point(user_id, username, amount=1):
+    conn = sqlite3.connect(DB)
+    c = conn.cursor()
+    c.execute("SELECT user_id FROM points WHERE user_id=?", (user_id,))
+    if not c.fetchone():
+        c.execute("INSERT INTO points (user_id,username,total_points,week_points,last_reset,last_submit) VALUES (?,?,0,0,?,NULL)",
+                  (user_id, username, datetime.now(timezone.utc).isoformat()))
+    c.execute("UPDATE points SET total_points=total_points+?, week_points=week_points+?, username=? WHERE user_id=?",
+              (amount, amount, username, user_id))
+    conn.commit()
+    c.execute("SELECT total_points, week_points FROM points WHERE user_id=?", (user_id,))
+    result = c.fetchone()
+    conn.close()
+    return result
+
+def manual_remove_point(user_id, amount=1):
+    conn = sqlite3.connect(DB)
+    c = conn.cursor()
+    c.execute("SELECT total_points, week_points FROM points WHERE user_id=?", (user_id,))
+    row = c.fetchone()
+    if not row:
+        conn.close()
+        return None
+    new_total = max(0, row[0] - amount)
+    new_week  = max(0, row[1] - amount)
+    c.execute("UPDATE points SET total_points=?, week_points=? WHERE user_id=?",
+              (new_total, new_week, user_id))
+    conn.commit()
+    conn.close()
+    return (new_total, new_week)
 
 
 # ─── Export Excel ─────────────────────────────────────────────────────────────
