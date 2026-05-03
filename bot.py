@@ -499,10 +499,10 @@ async def ssrp_help(ctx):
         "`!ssrphelp` — Bantuan"
     ), inline=False)
     embed.add_field(name="🔧 Commands Admin", value=(
-        "`!addpoint @user [n]` — Tambah poin manual\n"
-        "`!removepoint @user [n]` — Hapus poin (butuh !confirm)\n"
-        "`!confirm` — Konfirmasi removepoint\n"
-        "`!cancel` — Batalkan removepoint\n"
+        "`(bug only)!addpoint @user [n]` — Tambah poin manual\n"
+        "`(bug only)!removepoint @user [n]` — Hapus poin (butuh !confirm)\n"
+        "`(bug only)!confirm` — Konfirmasi removepoint\n"
+        "`(bug only)!cancel` — Batalkan removepoint\n"
         "`!export excel` — Export ke Excel\n"
         "`!export csv` — Export ke CSV\n"
         "`!export all` — Export keduanya\n"
