@@ -147,6 +147,29 @@ def manual_remove_point(user_id, amount=1):
     return (new_total, new_week)
 
 # ─── Export ───────────────────────────────────────────────────────────────────
+def get_user_photo_count(user_id):
+    """Ambil total foto yang pernah disubmit user."""
+    conn = sqlite3.connect(DB)
+    c = conn.cursor()
+    c.execute("SELECT COALESCE(SUM(photo_count), 0) FROM submissions WHERE user_id=? AND is_valid=1", (user_id,))
+    result = c.fetchone()[0]
+    conn.close()
+    return result
+
+def format_timestamp(ts_str):
+    """Format timestamp ISO ke WIB (UTC+7)."""
+    if not ts_str:
+        return "-"
+    try:
+        dt = datetime.fromisoformat(ts_str)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        # Convert ke WIB (UTC+7)
+        wib = dt + timedelta(hours=7)
+        return wib.strftime("%d/%m/%Y %H:%M WIB")
+    except:
+        return ts_str
+
 def generate_excel(rows: list) -> bytes:
     wb = openpyxl.Workbook()
     ws = wb.active
@@ -156,8 +179,8 @@ def generate_excel(rows: list) -> bytes:
     center = Alignment(horizontal="center", vertical="center")
     thin = Border(left=Side(style="thin"), right=Side(style="thin"),
                   top=Side(style="thin"), bottom=Side(style="thin"))
-    headers = ["No", "Username", "User ID", "Total Poin", "Poin Minggu Ini", "Terakhir Submit"]
-    col_widths = [5, 25, 22, 14, 18, 22]
+    headers = ["No", "Username", "User ID", "Total Poin", "Poin Minggu Ini", "Total Foto", "Terakhir Submit"]
+    col_widths = [5, 25, 22, 14, 18, 12, 25]
     for col, (h, w) in enumerate(zip(headers, col_widths), 1):
         cell = ws.cell(row=1, column=col, value=h)
         cell.fill = header_fill; cell.font = header_font
@@ -170,32 +193,29 @@ def generate_excel(rows: list) -> bytes:
     for i, (uid, uname, total, week, last_sub) in enumerate(rows, 1):
         row = i + 1
         fill = fill_even if i % 2 == 0 else fill_odd
-        last_str = "-"
-        if last_sub:
-            try: last_str = datetime.fromisoformat(last_sub).strftime("%d/%m/%Y %H:%M")
-            except: last_str = last_sub
-        for col, val in enumerate([i, uname, uid, total, week, last_str], 1):
+        photo_count = get_user_photo_count(uid)
+        last_str = format_timestamp(last_sub)
+        for col, val in enumerate([i, uname, uid, total, week, photo_count, last_str], 1):
             cell = ws.cell(row=row, column=col, value=val)
             cell.fill = fill; cell.font = data_font; cell.border = thin
-            cell.alignment = Alignment(horizontal="center" if col in (1,4,5) else "left", vertical="center")
+            cell.alignment = Alignment(horizontal="center" if col in (1,4,5,6) else "left", vertical="center")
         ws.row_dimensions[row].height = 22
     summary_row = len(rows) + 2
     ws.cell(row=summary_row, column=1, value="TOTAL").font = Font(bold=True, name="Arial")
     ws.cell(row=summary_row, column=4, value=f"=SUM(D2:D{len(rows)+1})").font = Font(bold=True, name="Arial")
     ws.cell(row=summary_row, column=5, value=f"=SUM(E2:E{len(rows)+1})").font = Font(bold=True, name="Arial")
+    ws.cell(row=summary_row, column=6, value=f"=SUM(F2:F{len(rows)+1})").font = Font(bold=True, name="Arial")
     buf = io.BytesIO(); wb.save(buf); buf.seek(0)
     return buf.read()
 
 def generate_csv(rows: list) -> bytes:
     buf = io.StringIO()
     writer = csv.writer(buf)
-    writer.writerow(["No", "Username", "User ID", "Total Poin", "Poin Minggu Ini", "Terakhir Submit"])
+    writer.writerow(["No", "Username", "User ID", "Total Poin", "Poin Minggu Ini", "Total Foto", "Terakhir Submit"])
     for i, (uid, uname, total, week, last_sub) in enumerate(rows, 1):
-        last_str = "-"
-        if last_sub:
-            try: last_str = datetime.fromisoformat(last_sub).strftime("%d/%m/%Y %H:%M")
-            except: last_str = last_sub
-        writer.writerow([i, uname, uid, total, week, last_str])
+        photo_count = get_user_photo_count(uid)
+        last_str = format_timestamp(last_sub)
+        writer.writerow([i, uname, uid, total, week, photo_count, last_str])
     return buf.getvalue().encode("utf-8-sig")
 
 # ─── Inactive Task ────────────────────────────────────────────────────────────
