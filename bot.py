@@ -1,7 +1,6 @@
 import discord
 from discord.ext import commands, tasks
 import asyncio
-import os
 import csv
 import io
 from datetime import datetime, timedelta, timezone
@@ -14,12 +13,13 @@ from openpyxl.utils import get_column_letter
 
 # ==================== CONFIG ====================
 DISCORD_TOKEN = os.environ.get("DISCORD_TOKEN")
-APPROVAL_CHANNEL_NAME = "ssrp-approval"    # Channel submit SSRP
-REPORT_CHANNEL_NAME   = "ssrp-report"     # Channel laporan otomatis
-INACTIVE_CHANNEL_NAME = "ssrp-inactive"   # Channel notif tidak aktif
+APPROVAL_CHANNEL_NAME = "ssrp-aproval"    # Channel submit SSRP
+REPORT_CHANNEL_NAME   = "leaderboard-ssrp-command"     # Channel laporan otomatis
+INACTIVE_CHANNEL_NAME = "inactive-permission"   # Channel notif tidak aktif
 SUBMIT_COOLDOWN       = 30                # Detik jeda antar submit (anti-spam)
 INACTIVE_CHECK_HOUR   = 9                 # Jam berapa cek inaktif (UTC)
 INACTIVE_CHECK_WEEKDAY= 0                 # 0=Senin, 6=Minggu
+ADMIN_ROLE_ID         = 1358301859663839374  # Role ID yang bisa pakai command admin
 # ================================================
 
 intents = discord.Intents.default()
@@ -349,7 +349,7 @@ async def leaderboard(ctx):
     await ctx.reply(embed=embed)
 
 @bot.command(name="export")
-@commands.has_permissions(administrator=True)
+@commands.has_any_role(ADMIN_ROLE_ID)
 async def export_data(ctx, fmt: str = "excel"):
     """Export data SSRP. !export excel / !export csv / !export all"""
     rows = get_all_points()
@@ -373,7 +373,7 @@ async def export_data(ctx, fmt: str = "excel"):
     await ctx.reply(f"📊 **Export SSRP Data** — {len(rows)} member", files=files)
 
 @bot.command(name="inactive")
-@commands.has_permissions(administrator=True)
+@commands.has_any_role(ADMIN_ROLE_ID)
 async def check_inactive_cmd(ctx, days: int = 7):
     """Cek siapa yang tidak aktif. !inactive atau !inactive 14"""
     inactive = get_inactive_users(days=days)
@@ -399,7 +399,7 @@ async def check_inactive_cmd(ctx, days: int = 7):
     await ctx.reply(embed=embed)
 
 @bot.command(name="resetweek")
-@commands.has_permissions(administrator=True)
+@commands.has_any_role(ADMIN_ROLE_ID)
 async def reset_week(ctx):
     """Reset poin mingguan semua member."""
     conn = sqlite3.connect(DB)
