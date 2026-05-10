@@ -29,7 +29,7 @@ ANNOUNCE_TEXT = """📢 **PENGUMUMAN SSRP MINGGUAN!**
 ⚠️ Poin minggu ini akan segera **direset hari Senin ini**!
 Pastikan kamu sudah submit SSRP kamu sebelum reset ya!
 
-🎭 Submit screenshot SSRP kamu di channel ini sekarang!
+🎭 Segera submit screenshot SSRP kamu di channel ini sekarang!
 🏆 Cek poin kamu dengan `!point`
 📊 Cek leaderboard dengan `!lb`"""
 # ═════════════════════════════════════════════════════
