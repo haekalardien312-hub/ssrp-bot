@@ -574,6 +574,7 @@ async def on_ready():
     auto_announce.start()
     auto_export.start()
     try:
+        await bot.tree.clear_commands(guild=None)
         await bot.tree.sync()
         print("✅ Slash commands synced!")
     except Exception as e:
