@@ -576,6 +576,11 @@ async def on_ready():
     try:
         bot.tree.clear_commands(guild=None)
         await bot.tree.sync()
+        # Sync ke semua guild secara langsung (lebih cepat)
+        for guild in bot.guilds:
+            bot.tree.copy_global_to(guild=guild)
+            await bot.tree.sync(guild=guild)
+            print(f"✅ Synced to guild: {guild.name}")
         print("✅ Slash commands synced!")
     except Exception as e:
         print(f"⚠️ Slash sync error: {e}")
