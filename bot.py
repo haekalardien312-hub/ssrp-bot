@@ -574,9 +574,9 @@ async def on_ready():
     auto_announce.start()
     auto_export.start()
     try:
+        await asyncio.sleep(3)  # Tunggu bot benar-benar siap
         bot.tree.clear_commands(guild=None)
         await bot.tree.sync()
-        # Sync ke semua guild secara langsung (lebih cepat)
         for guild in bot.guilds:
             bot.tree.copy_global_to(guild=guild)
             await bot.tree.sync(guild=guild)
